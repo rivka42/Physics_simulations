@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wave Superposition with Path Difference Control</title>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; }
+        canvas { border: 1px solid black; margin-top: 10px; cursor: grab; }
+
+        #toggleContainer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0;
+            right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px; width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+    </style>
+</head>
+<body>
+    <h2>Interactive Wave Superposition</h2>
+    <canvas id="waveCanvas" width="1200" height="600"></canvas>
+    <div id="toggleContainer">
+        <label class="switch">
+            <input type="checkbox" id="toggleSuperInput" checked>
+            <span class="slider"></span>
+        </label>
+        <span id="toggleLabel">Superposition On</span>
+    </div>
+    <p>Drag the vertical line to change the phase difference.</p>
+
+    <div style="margin: 10px 0;">
+        <span style="color: blue; font-weight: bold;">■</span> Fixed Wave &nbsp;&nbsp;
+        <span style="color: green; font-weight: bold;">■</span> Movable Wave &nbsp;&nbsp;
+        <span style="color: red; font-weight: bold;">■</span> Superposition
+    </div>
+
+    <script>
+        const canvas = document.getElementById("waveCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const WAVELENGTH = 2 * Math.PI;
+        const TOTAL_X_RANGE = 2 * WAVELENGTH;
+        const PADDING = 50;
+        let shiftX = 50;
+        let dragging = false;
+        let lastMouseX = 0;
+        let showSuperposition = true;
+
+        document.getElementById("toggleSuperInput").addEventListener("change", (e) => {
+            showSuperposition = e.target.checked;
+            document.getElementById("toggleLabel").innerText = showSuperposition ? "Superposition On" : "Superposition Off";
+            drawWave();
+        });
+
+        function drawAxes() {
+            const width = canvas.width;
+            const height = canvas.height;
+            const midY = height / 2;
+
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 1;
+            ctx.fillStyle = "black";
+            ctx.font = "16px Arial";
+
+            ctx.beginPath();
+            ctx.moveTo(PADDING, midY);
+            ctx.lineTo(width - PADDING, midY);
+            ctx.stroke();
+            ctx.fillText("Angle", width - 60, midY - 10);
+
+            ctx.beginPath();
+            ctx.moveTo(PADDING, 20);
+            ctx.lineTo(PADDING, height - 20);
+            ctx.stroke();
+            ctx.fillText("Amplitude", PADDING + 10, 30);
+
+            // X-Axis Ticks (π/3 intervals for 0 to 4π)
+            const numTicks = 13;
+            for (let i = 0; i < numTicks; i++) {
+                let x = PADDING + (i * (width - 2 * PADDING) / (numTicks - 1));
+                let frac = i / 3;
+                let label = "";
+                if (frac === 0) label = "0";
+                else if (frac === 1) label = "π";
+                else if (frac === 2) label = "2π";
+                else if (frac === 3) label = "3π";
+                else if (frac === 4) label = "4π";
+                else {
+                    let num = i;
+                    let denom = 3;
+                    let gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+                    let d = gcd(num, denom);
+                    num /= d;
+                    denom /= d;
+                    label = `${num}/${denom}π`;
+                }
+                ctx.fillText(label, x - 10, midY + 20);
+                ctx.beginPath();
+                ctx.moveTo(x, midY - 5);
+                ctx.lineTo(x, midY + 5);
+                ctx.stroke();
+            }
+
+            for (let j = -2; j <= 2; j++) {
+                if (j !== 0) {
+                    let y = midY - j * 80;
+                    ctx.fillText(j.toString(), PADDING - 20, y + 5);
+                    ctx.beginPath();
+                    ctx.moveTo(PADDING - 5, y);
+                    ctx.lineTo(PADDING + 5, y);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawWave() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawAxes();
+
+            const width = canvas.width - 2 * PADDING;
+            const height = canvas.height;
+            const midY = height / 2;
+            const scaleX = TOTAL_X_RANGE / width;
+            const amplitude = 80;
+            const waveStart = PADDING + shiftX;
+
+            ctx.lineWidth = 2;
+
+            ctx.beginPath();
+            ctx.strokeStyle = "blue";
+            for (let x = PADDING; x < width + PADDING; x++) {
+                const y = midY + amplitude * Math.sin(scaleX * (x - PADDING));
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.strokeStyle = "green";
+            let started = false;
+            for (let x = waveStart; x < width + PADDING; x++) {
+                if (!started) {
+                    ctx.moveTo(x, midY);
+                    started = true;
+                }
+                const y = midY + amplitude * Math.sin(scaleX * (x - waveStart));
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            if (showSuperposition) {
+                ctx.beginPath();
+                ctx.strokeStyle = "red";
+                started = false;
+                for (let x = waveStart; x < width + PADDING; x++) {
+                    if (!started) {
+                        ctx.moveTo(x, midY);
+                        started = true;
+                    }
+                    const y1 = Math.sin(scaleX * (x - PADDING));
+                    const y2 = Math.sin(scaleX * (x - waveStart));
+                    ctx.lineTo(x, midY + amplitude * (y1 + y2));
+                }
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = "purple";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(waveStart, 20);
+            ctx.lineTo(waveStart, height - 20);
+            ctx.stroke();
+        }
+
+        canvas.addEventListener("mousedown", (event) => {
+            const mouseX = event.clientX - canvas.getBoundingClientRect().left;
+            if (Math.abs(mouseX - (PADDING + shiftX)) < 10) {
+                dragging = true;
+                lastMouseX = mouseX;
+                canvas.style.cursor = "grabbing";
+            }
+        });
+
+        canvas.addEventListener("mousemove", (event) => {
+            if (dragging) {
+                let dx = event.clientX - canvas.getBoundingClientRect().left - lastMouseX;
+                shiftX += dx;
+                lastMouseX += dx;
+                drawWave();
+            }
+        });
+
+        canvas.addEventListener("mouseup", () => {
+            dragging = false;
+            canvas.style.cursor = "grab";
+        });
+
+        canvas.addEventListener("mouseleave", () => {
+            dragging = false;
+            canvas.style.cursor = "grab";
+        });
+
+        drawWave();
+    </script>
+</body>
+</html>
